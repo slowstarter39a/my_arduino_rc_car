@@ -42,13 +42,4 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <ListView
-        android:id="@+id/bt_device_list"
-        android:layout_width="346dp"
-        android:layout_height="202dp"
-        android:layout_marginStart="36dp"
-        android:layout_marginTop="157dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
 </androidx.constraintlayout.widget.ConstraintLayout>

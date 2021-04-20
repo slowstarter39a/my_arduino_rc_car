@@ -3,4 +3,8 @@
     <string name="bt">BT Connection information </string>
     <string name="status">Not connected</string>
     <string name="button_bt_ctl">Search BT Devices</string>
+    <string name="bt_device_list">BT Device list</string>
+    <string name="searching_bt_devices">Searching BT Devices</string>
+    <string name="ok">Ok</string>
+    <string name="cancel">Cancel</string>
 </resources>
