@@ -4,6 +4,7 @@ import android.Manifest;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
+import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHeadset;
@@ -14,19 +15,25 @@ import android.content.Context;
 
 import android.content.Intent;
 import android.content.IntentFilter;
-
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ListView;
 import android.view.View;
 import android.util.Log;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnCancelListener;
+import android.widget.Toast;
 
 import android.os.Bundle;
-
 import java.util.List;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
+    private Activity activity;
+    private View view;
     BluetoothAdapter bluetoothAdapter;
     BluetoothHeadset bluetoothHeadset;
     public final int REQUEST_ENABLE_BT = 1;
@@ -36,19 +43,47 @@ public class MainActivity extends AppCompatActivity {
     private BT_STATUS bt_status = BT_STATUS.NOT_CONNECTED;
     private Button buttonBtCtl;
     private ListView listView ;
+    private BTDeviceItemAdapter adapter;
+    ProgressDialog dialog = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        activity = this;
 
         buttonBtCtl = (Button) findViewById(R.id.button_bt_ctl);
-        listView = (ListView)findViewById(R.id.bt_device_list);
+        adapter = new BTDeviceItemAdapter(activity);
 
         buttonBtCtl.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Log.e(TAG, "button clicked");
+
+                view = activity.getLayoutInflater().inflate(R.layout.dialog_listview_layout, null);
+                listView = (ListView)view.findViewById(R.id.listview);
+                listView.setAdapter(adapter);
+
+                adapter.clearAll();
+                adapter.notifyDataSetChanged();
+
+                AlertDialog.Builder listViewDialog = new AlertDialog.Builder(activity);
+                listViewDialog.setView(view);
+                listViewDialog.setPositiveButton("Ok", null);
+                listViewDialog.setNegativeButton("Cancel", null);
+                listViewDialog.setTitle("BT Device list");
+
+                listViewDialog.show();
+                listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle("Title")
+                                .setMessage("Position clicked: " + position)
+                                .create()
+                                .show();
+                    }
+                });
 
                 bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
                 if (bluetoothAdapter == null) {
@@ -70,6 +105,7 @@ public class MainActivity extends AppCompatActivity {
                 };
 
                 ActivityCompat.requestPermissions(MainActivity.this, permission_list,  1);
+
             }
         });
 
@@ -95,19 +131,36 @@ public class MainActivity extends AppCompatActivity {
                 String deviceName = device.getName();
                 String deviceHardwareAddress = device.getAddress();
 
+
                 if (!isBtDeviceInList(device)) {
                     btDevices.add(device);
+                    adapter.addItem(new String(deviceName + "\n" + deviceHardwareAddress));
+
                     Log.e(TAG, "deviceName = " + deviceName + ", deviceHardwareAddress = " + deviceHardwareAddress);
                 }
             }
             else if(BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                 Log.e(TAG, "ACTION_DISCOVERY_STARTED intent received");
+                dialog = ProgressDialog.show(MainActivity.this, "", "Searching BT devices. Please wait...", true);
+                dialog.setCancelable(true);
+                dialog.setOnCancelListener(new OnCancelListener() {
+                    public void onCancel(DialogInterface arg0) {
+                        bluetoothAdapter.cancelDiscovery();
+                        Toast.makeText(MainActivity.this, "Searching stopped", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
             }
             else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 Log.e(TAG, "ACTION_DISCOVERY_FINISHED intent received");
+                if (dialog != null) {
+                    dialog.dismiss();
+                }
             }
             else {
             }
+
+            adapter.notifyDataSetChanged();
         }
         private boolean isBtDeviceInList(BluetoothDevice btDev) {
             int size = btDevices.size();
@@ -133,9 +186,4 @@ public class MainActivity extends AppCompatActivity {
 
         unregisterReceiver(receiver);
     }
-
-
-
-
-
 }
