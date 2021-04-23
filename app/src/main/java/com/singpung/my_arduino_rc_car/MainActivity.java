@@ -29,6 +29,7 @@ import android.widget.Toast;
 import android.os.Bundle;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -44,13 +45,17 @@ public class MainActivity extends AppCompatActivity {
     private Button buttonBtCtl;
     private ListView listView ;
     private BTDeviceItemAdapter adapter;
-    ProgressDialog dialog = null;
+    ProgressDialog dialog;
+    private boolean isActionFound = false;
+    List<BluetoothDevice> btDevices;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         activity = this;
+        dialog = new ProgressDialog(this);
+        btDevices = new ArrayList<BluetoothDevice>();
 
         buttonBtCtl = (Button) findViewById(R.id.button_bt_ctl);
         adapter = new BTDeviceItemAdapter(activity);
@@ -64,8 +69,10 @@ public class MainActivity extends AppCompatActivity {
                 listView = (ListView)view.findViewById(R.id.listview);
                 listView.setAdapter(adapter);
 
+                btDevices.clear();
                 adapter.clearAll();
                 adapter.notifyDataSetChanged();
+                isActionFound = false;
 
                 AlertDialog.Builder listViewDialog = new AlertDialog.Builder(activity);
                 listViewDialog.setView(view);
@@ -122,7 +129,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
-        List<BluetoothDevice> btDevices = new ArrayList<BluetoothDevice>();
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
@@ -131,6 +137,10 @@ public class MainActivity extends AppCompatActivity {
                 String deviceName = device.getName();
                 String deviceHardwareAddress = device.getAddress();
 
+                if (isActionFound == false) {
+                    adapter.addItem(new String("* Available devices"));
+                    isActionFound = true;
+                }
 
                 if (!isBtDeviceInList(device)) {
                     btDevices.add(device);
@@ -141,15 +151,14 @@ public class MainActivity extends AppCompatActivity {
             }
             else if(BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                 Log.e(TAG, "ACTION_DISCOVERY_STARTED intent received");
-                dialog = ProgressDialog.show(MainActivity.this, "", "Searching BT devices. Please wait...", true);
-                dialog.setCancelable(true);
-                dialog.setOnCancelListener(new OnCancelListener() {
-                    public void onCancel(DialogInterface arg0) {
-                        bluetoothAdapter.cancelDiscovery();
-                        Toast.makeText(MainActivity.this, "Searching stopped", Toast.LENGTH_SHORT).show();
+                dialog.setCancelable(false);
+                dialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+                dialog.setMessage("Searching BT devices. Please wait...");
+                dialog.setButton(DialogInterface.BUTTON_NEGATIVE, "Cancel", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
                     }
                 });
-
+                dialog.show();
             }
             else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
                 Log.e(TAG, "ACTION_DISCOVERY_FINISHED intent received");
@@ -178,6 +187,24 @@ public class MainActivity extends AppCompatActivity {
             bluetoothAdapter.cancelDiscovery();
         }
         bluetoothAdapter.startDiscovery();
+    }
+
+    private void queryPairedDevices() {
+        Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+
+        if (pairedDevices.size() > 0) {
+            adapter.addItem(new String("* Paired devices"));
+
+            for (BluetoothDevice device : pairedDevices) {
+                String deviceName = device.getName();
+                String deviceHardwareAddress = device.getAddress();
+
+                btDevices.add(device);
+                adapter.addItem(new String(deviceName + "\n" + deviceHardwareAddress));
+
+                Log.e(TAG, "deviceName = " + deviceName + ", deviceHardwareAddress = " + deviceHardwareAddress);
+            }
+        }
     }
 
     @Override
