@@ -1,14 +1,11 @@
 package com.singpung.my_arduino_rc_car;
 
 import android.content.Context;
-import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.BaseAdapter;
 import android.app.Activity;
-import android.view.View.OnClickListener;
-import android.view.View.OnLongClickListener;
 
 import java.util.ArrayList;
 import android.view.LayoutInflater;
