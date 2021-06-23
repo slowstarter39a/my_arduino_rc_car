@@ -2,6 +2,7 @@ package com.singpung.my_arduino_rc_car;
 
 import android.Manifest;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 
 import android.app.ProgressDialog;
@@ -16,10 +17,17 @@ import android.content.Context;
 
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Point;
 import android.os.Handler;
 import android.os.Message;
+import android.util.DisplayMetrics;
+import android.view.Display;
+import android.view.MotionEvent;
+import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.view.View;
 import android.util.Log;
@@ -33,6 +41,8 @@ import android.os.Bundle;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -57,6 +67,15 @@ public class MainActivity extends AppCompatActivity {
     public TextView statusTextView;
     BluetoothDevice curBtDevice;
 
+    TimerTask timerTask;
+    Timer timer = new Timer();
+    ImageView imageView;
+
+    float baseX;
+    float baseY;
+    int   imgHalfWidth;
+    int   imgHalfHeight;
+
     Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
@@ -76,6 +95,51 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private void startTimerTask()
+    {
+        stopTimerTask();
+
+        timerTask = new TimerTask()
+        {
+            float curX = imageView.getX();
+            float curY = imageView.getY();
+            float dx = curX - baseX;
+            float dy = curY - baseY;
+
+            float newPosX = 0;
+            float newPosY = 0;
+            int i = 0;
+
+            @Override
+            public void run()
+            {
+                if ( i < 10) {
+                    newPosX = curX - i * dx/10;
+                    newPosY = curY - i * dy/10;
+
+                    imageView.setX(newPosX);
+                    imageView.setY(newPosY);
+
+                    i++;
+                }
+                else {
+                    imageView.setX(baseX);
+                    imageView.setY(baseY);
+                    stopTimerTask();
+                }
+            }
+        };
+        timer.schedule(timerTask,0 ,30);
+    }
+
+    private void stopTimerTask()
+    {
+        if(timerTask != null)
+        {
+            timerTask.cancel();
+            timerTask = null;
+        }
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -87,6 +151,51 @@ public class MainActivity extends AppCompatActivity {
 
         buttonBtCtl = (Button) findViewById(R.id.button_bt_ctl);
         adapter = new BTDeviceItemAdapter(activity);
+
+        imageView = (ImageView)findViewById(R.id.imageView);
+        imageView.setImageResource(R.drawable.circle_car_control);
+
+        Display display = getWindowManager().getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        int width = size.x;
+        int height = size.y;
+
+        imageView.getViewTreeObserver()
+                .addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                    @Override
+                    public void onGlobalLayout() {
+                        imgHalfWidth = imageView.getWidth()/2;
+                        imgHalfHeight = imageView.getHeight()/2;
+
+                        baseX = width/2 - imgHalfWidth;
+                        baseY = height - height/2;
+                        imageView.setX(baseX);
+                        imageView.setY(baseY);
+
+                        imageView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    }
+                });
+
+        view = findViewById(R.id.main);
+        view.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View view, MotionEvent motionEvent) {
+
+                if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
+                    stopTimerTask();
+                }
+                else if (motionEvent.getAction() == MotionEvent.ACTION_MOVE) {
+                    imageView.setX(motionEvent.getX() - imgHalfWidth);
+                    imageView.setY(motionEvent.getY() - imgHalfHeight);
+                }
+                else if (motionEvent.getAction() == MotionEvent.ACTION_UP) {
+                    startTimerTask();
+                }
+                return true;
+            }
+        });
+
 
         buttonBtCtl.setOnClickListener(new View.OnClickListener() {
             @Override
