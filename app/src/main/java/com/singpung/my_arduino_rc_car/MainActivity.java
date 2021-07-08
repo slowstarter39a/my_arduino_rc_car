@@ -54,7 +54,9 @@ public class MainActivity extends AppCompatActivity {
     //private static final String TAG = MainActivity.class.getSimpleName();
     private static final String TAG = "My_arduino_rc_car";
 
-    public enum BT_STATUS {NOT_CONNECTED, SEARCHED, CONNECTED}
+    public final byte RC_CAR_COMMAND_GET_VERSION = 0;
+    public final byte RC_CAR_COMMAND_DRIVE = 1;
+    public enum BT_STATUS {NOT_CONNECTED, SEARCHED, CONNECTED};
 
     private BT_STATUS bt_status = BT_STATUS.NOT_CONNECTED;
     private Button buttonBtCtl;
@@ -79,11 +81,13 @@ public class MainActivity extends AppCompatActivity {
     Handler handler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
-           // String temp_str = "Hello_Arduino";
-
             switch(msg.what) {
                 case BTCommunicationThread.MessageConstants.MESSAGE_READ:
-                    //btConnectThread.write(temp_str.getBytes());
+                    byte[] readBuf = (byte[]) msg.obj;
+                    // construct a string from the valid bytes in the buffer
+                    String readMessage = new String(readBuf, 0, msg.arg1);
+                    // btConnectThread.write(readMessage.getBytes());
+
                     break;
                 case BTCommunicationThread.MessageConstants.MESSAGE_WRITE:
                     break;
@@ -121,11 +125,18 @@ public class MainActivity extends AppCompatActivity {
                     imageView.setY(newPosY);
 
                     i++;
+
+                    if (bt_status == BT_STATUS.CONNECTED) {
+                        sendDatatoTarget(RC_CAR_COMMAND_DRIVE, newPosX + imgHalfWidth, newPosY + imgHalfHeight);
+                    }
                 }
                 else {
                     imageView.setX(baseX);
                     imageView.setY(baseY);
                     stopTimerTask();
+                    if (bt_status == BT_STATUS.CONNECTED) {
+                        sendDatatoTarget(RC_CAR_COMMAND_DRIVE, baseX + imgHalfWidth, baseY + imgHalfHeight);
+                    }
                 }
             }
         };
@@ -140,6 +151,52 @@ public class MainActivity extends AppCompatActivity {
             timerTask = null;
         }
     }
+
+    public boolean sendDatatoTarget(byte rc_car_command, float x, float y) {
+        switch (rc_car_command) {
+            case RC_CAR_COMMAND_DRIVE:
+
+                byte[] dataBuf = new byte[12];
+
+                x = x - baseX - imgHalfWidth;
+                y = y - baseY - imgHalfHeight;
+                Log.e(TAG, "x == " + x + ", y == " + y + ", baseX == " + baseX + ", baseY == " + baseY);
+
+                x = Math.max(Math.min(500, x), -500);
+                y = Math.max(Math.min(800, y), -800);
+
+                x = (x * 255 / 500)/2 ;
+                y = y * 255 / 800;
+
+                int front_left = (int) Math.max(Math.min(y - x, 255), -255);
+                int front_right = (int) Math.max(Math.min(y + x, 255), -255);
+
+                dataBuf[0] = 'm';
+                dataBuf[1] = 'y';
+                dataBuf[2] = 'c';
+                dataBuf[3] = 'a';
+                dataBuf[4] = 'r';
+                dataBuf[5] = 11; // length
+                dataBuf[6] = rc_car_command;
+
+                dataBuf[7] = (byte)(front_left & 0xff);
+                dataBuf[8] = (byte)((front_left >> 8) & 0xff);
+                dataBuf[9] = (byte)(front_right & 0xff);
+                dataBuf[10] = (byte)((front_right >> 8) & 0xff);
+                dataBuf[11] = '\n';
+
+                Log.e(TAG, "front_left == " + front_left + ", front_right == " + front_right);
+
+                btConnectThread.write(dataBuf);
+                break;
+
+            default:
+                break;
+        }
+
+        return true;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -181,13 +238,16 @@ public class MainActivity extends AppCompatActivity {
         view.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
-
                 if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
                     stopTimerTask();
                 }
                 else if (motionEvent.getAction() == MotionEvent.ACTION_MOVE) {
                     imageView.setX(motionEvent.getX() - imgHalfWidth);
                     imageView.setY(motionEvent.getY() - imgHalfHeight);
+
+                    if (bt_status == BT_STATUS.CONNECTED) {
+                        sendDatatoTarget(RC_CAR_COMMAND_DRIVE, motionEvent.getX(), motionEvent.getY());
+                    }
                 }
                 else if (motionEvent.getAction() == MotionEvent.ACTION_UP) {
                     startTimerTask();
